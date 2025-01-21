@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        .carousel-container {
+            position: relative;
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .carousel {
+            display: flex;
+            transition: transform 0.5s ease-in-out;
+            gap: 20px;
+            padding: 0 10px;
+        }
+
+        .slide {
+            flex: 0 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #3498db;
+            color: white;
+            font-size: 2em;
+            height: 300px;
+            border-radius: 8px;
+        }
+
+        @media (min-width: 768px) {
+            .slide {
+                width: calc((100% - 80px) / 5);
+            }
+        }
+
+        @media (max-width: 767px) {
+            .slide {
+                width: calc((100% - 40px) / 3);
+            }
+        }
+
+        .nav-buttons-group {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1;
+        }
+
+        .nav-buttons-group.left {
+            left: 10px;
+        }
+
+        .nav-buttons-group.right {
+            right: 10px;
+        }
+
+        .carousel-button {
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            border: none;
+            padding: 15px;
+            cursor: pointer;
+            font-size: 18px;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.2s ease;
+        }
+
+        .carousel-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .carousel-button:hover:not(:disabled) {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .carousel-button.single {
+            font-size: 20px;
+        }
+
+        .carousel-button.full {
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="carousel-container">
+        <div class="nav-buttons-group left">
+            <button class="carousel-button full prev-full">⇐</button>
+            <button class="carousel-button single prev">←</button>
+        </div>
+        <div class="nav-buttons-group right">
+            <button class="carousel-button full next-full">⇒</button>
+            <button class="carousel-button single next">→</button>
+        </div>
+        <div class="carousel">
+        </div>
+    </div>
+
+    <script>
+        class Carousel {
+            constructor() {
+                this.container = document.querySelector('.carousel');
+                this.slides = [];
+                this.currentIndex = 0;
+                this.visibleSlides = window.innerWidth >= 768 ? 5 : 3;
+                this.originalSlidesCount = 5;
+                this.multiplier = 4;
+                this.isAnimating = false;
+                this.buttons = {
+                    prev: document.querySelector('.prev'),
+                    next: document.querySelector('.next'),
+                    prevFull: document.querySelector('.prev-full'),
+                    nextFull: document.querySelector('.next-full')
+                };
+                this.initSlides();
+                this.setupEventListeners();
+            }
+
+            initSlides() {
+                const totalSlides = this.originalSlidesCount * this.multiplier;
+                
+                for (let i = 0; i < totalSlides; i++) {
+                    const slide = document.createElement('div');
+                    slide.className = 'slide';
+                    slide.textContent = (i % this.originalSlidesCount) + 1;
+                    this.slides.push(slide);
+                    this.container.appendChild(slide);
+                }
+
+                this.currentIndex = Math.floor(totalSlides / 4);
+                this.updatePosition(false);
+            }
+
+            setupEventListeners() {
+                // Fonction de debounce pour les clics
+                const createDebouncedClick = (direction, count) => {
+                    let timeout;
+                    return () => {
+                        if (this.isAnimating) return;
+                        
+                        this.disableAllButtons();
+                        this.slide(direction, count);
+                        
+                        clearTimeout(timeout);
+                        timeout = setTimeout(() => {
+                            this.enableAllButtons();
+                        }, 250); // Délai de 250ms entre les clics
+                    };
+                };
+
+                // Navigation simple
+                this.buttons.prev.addEventListener('click', createDebouncedClick('prev', 1));
+                this.buttons.next.addEventListener('click', createDebouncedClick('next', 1));
+
+                // Navigation complète
+                this.buttons.prevFull.addEventListener('click', createDebouncedClick('prev', this.visibleSlides));
+                this.buttons.nextFull.addEventListener('click', createDebouncedClick('next', this.visibleSlides));
+
+                this.container.addEventListener('transitionend', () => {
+                    this.handleTransitionEnd();
+                    this.isAnimating = false;
+                });
+
+                window.addEventListener('resize', () => {
+                    const oldVisibleSlides = this.visibleSlides;
+                    this.visibleSlides = window.innerWidth >= 768 ? 5 : 3;
+                    if (oldVisibleSlides !== this.visibleSlides) {
+                        this.updatePosition(false);
+                    }
+                });
+            }
+
+            disableAllButtons() {
+                Object.values(this.buttons).forEach(button => {
+                    button.disabled = true;
+                });
+            }
+
+            enableAllButtons() {
+                Object.values(this.buttons).forEach(button => {
+                    button.disabled = false;
+                });
+            }
+
+            handleTransitionEnd() {
+                const totalSlides = this.slides.length;
+                
+                if (this.currentIndex <= this.originalSlidesCount) {
+                    this.currentIndex += this.originalSlidesCount;
+                    this.updatePosition(false);
+                } else if (this.currentIndex >= totalSlides - this.originalSlidesCount - this.visibleSlides) {
+                    this.currentIndex -= this.originalSlidesCount;
+                    this.updatePosition(false);
+                }
+            }
+
+            slide(direction, count) {
+                this.isAnimating = true;
+                if (direction === 'next') {
+                    this.currentIndex += count;
+                } else {
+                    this.currentIndex -= count;
+                }
+                this.updatePosition(true);
+            }
+
+            updatePosition(withTransition) {
+                const slideWidth = this.slides[0].offsetWidth;
+                const gapWidth = 20;
+                const offset = -(this.currentIndex * (slideWidth + gapWidth));
+
+                if (!withTransition) {
+                    this.container.style.transition = 'none';
+                } else {
+                    this.container.style.transition = 'transform 0.5s ease-in-out';
+                }
+                
+                this.container.style.transform = `translateX(${offset}px)`;
+                
+                if (!withTransition) {
+                    this.container.offsetHeight;
+                    this.container.style.transition = 'transform 0.5s ease-in-out';
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new Carousel();
+        });
+    </script>
+</body>
+</html>
